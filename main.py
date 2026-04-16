@@ -3,70 +3,62 @@ import plotly.graph_objects as go
 import numpy as np
 
 # Настройка страницы
-st.set_page_config(page_title="Maglev Model", layout="wide")
+st.set_page_config(page_title="Maglev Pro Model", layout="wide")
 
-st.title("🧲 Интерактивная модель магнитной левитации")
-st.write("Эта модель показывает, как сила магнита и расстояние влияют на способность удерживать груз.")
+st.title("🧲 Расширенная модель магнитной левитации")
+st.write("В этой версии увеличен предел мощности магнита для тестирования сильных полей.")
 
-# Боковая панель с настройками
-st.sidebar.header("Параметры системы")
-magnet_power = st.sidebar.slider("Сила (мощность) магнита", 0.1, 5.0, 1.0, help="Магнитная индукция в условных единицах")
-mass_target = st.sidebar.slider("Масса груза (г)", 1, 100, 20)
-current_dist = st.sidebar.slider("Текущее расстояние (мм)", 1, 50, 15)
+# Боковая панель
+st.sidebar.header("Настройки симуляции")
+# Увеличили max_value до 50.0
+magnet_power = st.sidebar.slider("Сила магнита (M)", 0.1, 50.0, 5.0, step=0.1)
+mass_target = st.sidebar.slider("Масса груза (г)", 1, 500, 50)
+current_dist = st.sidebar.slider("Текущее расстояние (мм)", 1, 100, 20)
 
-# Константа пропорциональности
+# Константа (можно менять для калибровки под реальные весы)
 k = 500 
 
-# Расчет данных для графика
-distances = np.linspace(2, 60, 200) # Расстояние от 2 до 60 мм
-# Формула: Сила = (Константа * Сила магнита) / Расстояние^2
+# Расчет
+distances = np.linspace(1, 120, 300) 
 force_line = (k * magnet_power) / (distances**2)
-
-# Расчет текущей силы в выбранной точке
 current_force = (k * magnet_power) / (current_dist**2)
 
-# Создание графика
+# График
 fig = go.Figure()
 
-# Линия теоретической силы
-fig.add_trace(go.Scatter(
-    x=distances, y=force_line, 
-    name='Кривая силы',
-    line=dict(color='blue', width=3)
-))
+# Теоретическая кривая
+fig.add_trace(go.Scatter(x=distances, y=force_line, name='Магнитная сила', line=dict(color='blue', width=3)))
 
-# Точка текущего положения
+# Линия массы (порог)
+fig.add_trace(go.Scatter(x=distances, y=[mass_target]*len(distances), name='Вес груза', line=dict(color='green', dash='dash')))
+
+# Точка замера
 fig.add_trace(go.Scatter(
     x=[current_dist], y=[current_force],
     mode='markers+text',
-    name='Ваше положение',
+    name='Рабочая точка',
     text=[f"{current_force:.1f} г"],
     textposition="top right",
     marker=dict(size=15, color='red', symbol='diamond')
 ))
 
-# Линия веса груза (горизонтальная)
-fig.add_trace(go.Scatter(
-    x=distances, y=[mass_target]*len(distances),
-    name='Вес груза (порог левитации)',
-    line=dict(color='green', dash='dash')
-))
-
 fig.update_layout(
-    xaxis_title="Расстояние d (мм)",
-    yaxis_title="Удерживающая сила F (г)",
+    xaxis_title="Расстояние (мм)",
+    yaxis_title="Сила удержания (г)",
+    yaxis_range=[0, mass_target * 2 if current_force < mass_target * 2 else current_force * 1.2],
     hovermode="x unified"
 )
 
-# Вывод графика
 st.plotly_chart(fig, use_container_width=True)
 
-# Научный вывод
-st.subheader("Математическая справка")
-st.latex(r"F \approx \frac{k \cdot M}{d^2}")
-st.write(f"При силе магнита **{magnet_power}** и расстоянии **{current_dist} мм**, система может удерживать до **{current_force:.1f} грамм**.")
+# Индикаторы
+col1, col2 = st.columns(2)
+with col1:
+    st.metric("Сила в точке", f"{current_force:.1f} г")
+with col2:
+    if current_force >= mass_target:
+        st.success("УДЕРЖИТ")
+    else:
+        st.error("УПАДЕТ")
 
-if current_force >= mass_target:
-    st.success("✅ Левитация возможна! Магнитная сила превышает вес груза.")
-else:
-    st.error("❌ Груз упадет. Магнитная сила слишком слаба для такого расстояния.")
+st.latex(r"F = \frac{k \cdot M}{d^2}")
