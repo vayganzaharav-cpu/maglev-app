@@ -27,10 +27,20 @@ current_force = (k * magnet_power) / (current_dist**2)
 fig = go.Figure()
 
 # Теоретическая кривая
-fig.add_trace(go.Scatter(x=distances, y=force_line, name='Магнитная сила', line=dict(color='blue', width=3)))
+fig.add_trace(go.Scatter(
+    x=distances, 
+    y=force_line, 
+    name='Магнитная сила', 
+    line=dict(color='blue', width=3)
+))
 
 # Линия массы (порог)
-fig.add_trace(go.Scatter(x=distances, y=[mass_target]*len(distances), name='Вес груза', line=dict(color='green', dash='dash')))
+fig.add_trace(go.Scatter(
+    x=distances, 
+    y=[mass_target]*len(distances), 
+    name='Вес груза', 
+    line=dict(color='green', dash='dash')
+))
 
 # Точка замера
 fig.add_trace(go.Scatter(
@@ -45,7 +55,8 @@ fig.add_trace(go.Scatter(
 fig.update_layout(
     xaxis_title="Расстояние (мм)",
     yaxis_title="Сила удержания (г)",
-    yaxis_range=[0, mass_target * 2 if current_force < mass_target * 2 else current_force * 1.2],
+    # Динамический диапазон оси Y
+    yaxis_range=[0, max(mass_target * 1.5, current_force * 1.2)],
     hovermode="x unified"
 )
 
@@ -57,8 +68,8 @@ with col1:
     st.metric("Сила в точке", f"{current_force:.1f} г")
 with col2:
     if current_force >= mass_target:
-        st.success("УДЕРЖИТ")
+        st.success("СТАТУС: УДЕРЖИТ ✅")
     else:
-        st.error("УПАДЕТ")
+        st.error("СТАТУС: УПАДЕТ ❌")
 
 st.latex(r"F = \frac{k \cdot M}{d^2}")
