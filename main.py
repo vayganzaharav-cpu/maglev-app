@@ -3,76 +3,90 @@ import plotly.graph_objects as go
 import numpy as np
 
 # 1. Настройка страницы
-st.set_page_config(page_title="Maglev Research Lab", layout="wide")
+st.set_page_config(page_title="Maglev Dynamic Model", layout="wide")
 
-st.title("🔬 Исследование магнитной левитации (Maglev)")
+st.title("🧲 Динамическая модель магнитного поля")
 st.markdown("---")
 
-# 2. Панель управления в боковой колонке
+# 2. Управление в боковой панели
 with st.sidebar:
-    st.header("⚙️ Параметры системы")
+    st.header("⚙️ Настройки")
     
-    with st.expander("🧲 Свойства магнита", expanded=True):
-        magnet_power = st.slider("Мощность магнита (M)", 0.1, 50.0, 10.0, step=0.5)
-        k_factor = st.number_input("Коэффициент калибровки (k)", value=500)
+    # Изменение мощности магнита теперь перестраивает всю функцию
+    magnet_power = st.slider("Мощность магнита (M)", 0.5, 100.0, 15.0, step=0.5)
+    k_factor = st.number_input("Коэффициент (k)", value=500)
+    
+    st.markdown("---")
+    mass_target = st.number_input("Масса груза (г)", value=50)
+    current_dist = st.slider("Расстояние (мм)", 1, 100, 20)
 
-    with st.expander("📐 Условия эксперимента", expanded=True):
-        mass_target = st.number_input("Масса объекта (г)", value=45)
-        current_dist = st.slider("Текущий зазор (мм)", 1, 80, 25)
+# 3. Расчеты
+# Генерируем значения для всей гиперболы
+d_axis = np.linspace(2, 100, 500)
+# F = (k * M) / d^2
+f_axis = (k_factor * magnet_power) / (d_axis**2)
 
-# 3. Математические расчеты
-dist_range = np.linspace(2, 100, 400)
-theoretical_force = (k_factor * magnet_power) / (dist_range**2)
-current_force_val = (k_factor * magnet_power) / (current_dist**2)
+# Сила в конкретной выбранной точке
+f_at_point = (k_factor * magnet_power) / (current_dist**2)
 
-# 4. Визуализация (График)
+# 4. Построение графика
 fig = go.Figure()
 
-# Теоретическая кривая
+# Основная динамическая гипербола
 fig.add_trace(go.Scatter(
-    x=dist_range, y=theoretical_force,
-    name='Теоретическая кривая силы',
-    line=dict(color='#1f77b4', width=4)
+    x=d_axis, 
+    y=f_axis,
+    name='Кривая силы F(d)',
+    line=dict(color='#1f77b4', width=4),
+    fill='tozeroy', # Заливка под графиком для наглядности зоны влияния
+    fillcolor='rgba(31, 119, 180, 0.1)'
 ))
 
-# Рабочая точка (Текущий замер)
+# Порог массы (горизонтальная линия)
 fig.add_trace(go.Scatter(
-    x=[current_dist], y=[current_force_val],
+    x=d_axis, 
+    y=[mass_target]*len(d_axis),
+    name='Вес груза (порог)',
+    line=dict(color='green', width=2, dash='dash')
+))
+
+# Точка текущего замера
+fig.add_trace(go.Scatter(
+    x=[current_dist], 
+    y=[f_at_point],
     mode='markers+text',
-    name='Текущее состояние',
-    text=[f"{current_force_val:.1f}г"],
-    textposition="top center",
-    marker=dict(size=18, color='#d62728', symbol='diamond')
+    name='Текущий замер',
+    text=[f"{f_at_point:.1f} г"],
+    textposition="top right",
+    marker=dict(size=15, color='red', symbol='circle', line=dict(width=2, color='white'))
 ))
 
 fig.update_layout(
     height=600,
-    xaxis_title="Расстояние между магнитами d (мм)",
-    yaxis_title="Подъемная сила F (грамм)",
+    xaxis_title="Расстояние d (мм)",
+    yaxis_title="Сила левитации F (г)",
+    yaxis_range=[0, max(mass_target * 1.5, f_at_point * 1.2)], # Автомасштаб
     template="plotly_white",
-    hovermode="x unified",
-    legend=dict(yanchor="top", y=0.99, xanchor="right", x=0.99)
+    hovermode="x unified"
 )
 
-# 5. Вывод интерфейса
-col_graph, col_info = st.columns([3, 1])
+# 5. Интерфейс
+col_graph, col_stats = st.columns([3, 1])
 
 with col_graph:
     st.plotly_chart(fig, use_container_width=True)
 
-with col_info:
-    st.subheader("📊 Аналитика")
-    st.metric("Сила в точке", f"{current_force_val:.1f} г", 
-              delta=f"{current_force_val - mass_target:.1f} г")
+with col_stats:
+    st.subheader("📊 Данные")
+    st.metric("Сила магнита", f"{f_at_point:.1f} г")
+    st.metric("Вес груза", f"{mass_target} г")
     
-    if current_force_val >= mass_target:
-        st.success("✅ ЛЕВИТАЦИЯ")
+    delta = f_at_point - mass_target
+    if delta >= 0:
+        st.success(f"Левитация: ДА (+{delta:.1f} г)")
     else:
-        st.error("❌ ПАДЕНИЕ")
+        st.error(f"Левитация: НЕТ ({delta:.1f} г)")
 
 st.markdown("---")
-
-# Математический блок
-st.subheader("📝 Математическая модель")
-st.latex(r"F = \frac{k \cdot M}{d^2}")
-st.info("Модель построена на основе закона обратных квадратов.")
+st.latex(r"F(d) = \frac{k \cdot M}{d^2}")
+st.info("При изменении мощности (M) меняется форма всей кривой, а не только положение точки.")
