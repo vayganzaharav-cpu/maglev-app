@@ -1,75 +1,107 @@
 import streamlit as st
 import plotly.graph_objects as go
 import numpy as np
+import pandas as pd
 
-# Настройка страницы
-st.set_page_config(page_title="Maglev Pro Model", layout="wide")
+# 1. Настройка внешнего вида страницы
+st.set_page_config(page_title="Maglev Research Lab", layout="wide")
 
-st.title("🧲 Расширенная модель магнитной левитации")
-st.write("В этой версии увеличен предел мощности магнита для тестирования сильных полей.")
+# Кастомный заголовок с иконкой
+st.title("🔬 Исследование магнитной левитации (Maglev)")
+st.markdown("""
+---
+**Цель проекта:** Изучение зависимости подъемной силы магнитного поля от расстояния и мощности источника. 
+Данное приложение является математическим двойником физической установки.
+""")
 
-# Боковая панель
-st.sidebar.header("Настройки симуляции")
-# Увеличили max_value до 50.0
-magnet_power = st.sidebar.slider("Сила магнита (M)", 0.1, 50.0, 5.0, step=0.1)
-mass_target = st.sidebar.slider("Масса груза (г)", 1, 500, 50)
-current_dist = st.sidebar.slider("Текущее расстояние (мм)", 1, 100, 20)
+# 2. Боковая панель управления (Sidebar)
+with st.sidebar:
+    st.header("⚙️ Параметры системы")
+    
+    with st.expander("🧲 Свойства магнита", expanded=True):
+        magnet_power = st.slider("Мощность (M)", 0.1, 50.0, 10.0, step=0.5)
+        k_factor = st.number_input("Коэффициент калибровки (k)", value=500, help="Подстраивается под реальные весы")
 
-# Константа (можно менять для калибровки под реальные весы)
-k = 500 
+    with st.expander("📐 Условия замера", expanded=True):
+        mass_target = st.number_input("Масса объекта (г)", value=45)
+        current_dist = st.slider("Текущий зазор (мм)", 1, 80, 25)
 
-# Расчет
-distances = np.linspace(1, 120, 300) 
-force_line = (k * magnet_power) / (distances**2)
-current_force = (k * magnet_power) / (current_dist**2)
+# 3. Подготовка данных
+dist_range = np.linspace(2, 100, 400)
+theoretical_force = (k_factor * magnet_power) / (dist_range**2)
+current_force_val = (k_factor * magnet_power) / (current_dist**2)
 
-# График
+# ПРИМЕР ТВОИХ ДАННЫХ (Замени цифры на свои реальные замеры!)
+# Формат: [Расстояние в мм, Вес на весах в граммах]
+my_data = [
+    [10, 250], [15, 110], [20, 60], [25, 40], [30, 28]
+]
+df_real = pd.DataFrame(my_data, columns=['dist', 'mass'])
+
+# 4. Создание графиков
 fig = go.Figure()
 
-# Теоретическая кривая
+# Линия теории
 fig.add_trace(go.Scatter(
-    x=distances, 
-    y=force_line, 
-    name='Магнитная сила', 
-    line=dict(color='blue', width=3)
+    x=dist_range, y=theoretical_force,
+    name='Теоретическая кривая (1/d²)',
+    line=dict(color='#1f77b4', width=4)
 ))
 
-# Линия массы (порог)
+# Точки реальных экспериментов
 fig.add_trace(go.Scatter(
-    x=distances, 
-    y=[mass_target]*len(distances), 
-    name='Вес груза', 
-    line=dict(color='green', dash='dash')
+    x=df_real['dist'], y=df_real['mass'],
+    mode='markers',
+    name='Реальные замеры (эксперимент)',
+    marker=dict(size=12, color='#ff7f0e', symbol='circle', line=dict(width=2, color='white'))
 ))
 
-# Точка замера
+# Рабочая точка (красный ромб)
 fig.add_trace(go.Scatter(
-    x=[current_dist], y=[current_force],
+    x=[current_dist], y=[current_force_val],
     mode='markers+text',
-    name='Рабочая точка',
-    text=[f"{current_force:.1f} г"],
-    textposition="top right",
-    marker=dict(size=15, color='red', symbol='diamond')
+    name='Текущее состояние',
+    text=[f"Сила: {current_force_val:.1f}г"],
+    textposition="top center",
+    marker=dict(size=18, color='#d62728', symbol='diamond')
 ))
 
+# Настройка осей и стиля
 fig.update_layout(
-    xaxis_title="Расстояние (мм)",
-    yaxis_title="Сила удержания (г)",
-    # Динамический диапазон оси Y
-    yaxis_range=[0, max(mass_target * 1.5, current_force * 1.2)],
-    hovermode="x unified"
+    height=600,
+    xaxis_title="Расстояние между магнитами d (мм)",
+    yaxis_title="Подъемная сила F (грамм)",
+    legend=dict(yanchor="top", y=0.99, xanchor="right", x=0.99),
+    hovermode="x unified",
+    template="plotly_white"
 )
 
-st.plotly_chart(fig, use_container_width=True)
+# 5. Вывод интерфейса
+col_graph, col_info = st.columns([3, 1])
 
-# Индикаторы
-col1, col2 = st.columns(2)
-with col1:
-    st.metric("Сила в точке", f"{current_force:.1f} г")
-with col2:
-    if current_force >= mass_target:
-        st.success("СТАТУС: УДЕРЖИТ ✅")
+with col_graph:
+    st.plotly_chart(fig, use_container_width=True)
+
+with col_info:
+    st.subheader("📊 Аналитика")
+    st.metric("Сила в точке", f"{current_force_val:.1f} г", delta=f"{current_force_val - mass_target:.1f} г")
+    
+    if current_force_val >= mass_target:
+        st.success("✅ ЛЕВИТАЦИЯ")
+        st.write("Магнитное поле достаточно сильное для удержания веса.")
     else:
-        st.error("СТАТУС: УПАДЕТ ❌")
+        st.error("❌ ПАДЕНИЕ")
+        st.write("Вес объекта превышает силу магнитного поля.")
 
-st.latex(r"F = \frac{k \cdot M}{d^2}")
+st.markdown("---")
+# Научный блок
+col_math, col_table = st.columns(2)
+
+with col_math:
+    st.subheader("📝 Математическая модель")
+    st.latex(r"F(d) = \frac{k \cdot M}{d^2}")
+    st.info("Закон обратных квадратов описывает идеализированное взаимодействие магнитных полюсов.")
+
+with col_table:
+    st.subheader("📋 Данные эксперимента")
+    st.table(df_real)
